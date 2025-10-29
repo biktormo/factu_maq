@@ -1,0 +1,18 @@
+:root {
+  /* Paleta de colores de John Deere */
+  --jd-green: #367C2B;
+  --jd-yellow: #FFDE00;
+  --jd-dark-gray: #222222;
+  --jd-light-gray: #E5E5E5;
+
+  /* Sobrescribimos los colores de Pico.css con los de John Deere */
+  --primary: var(--jd-green);
+  --primary-hover: #2a6322; /* Un verde un poco más oscuro para el hover */
+  --primary-focus: rgba(54, 124, 43, 0.25);
+  --primary-inverse: #FFF;
+}
+
+/* Aplicamos un estilo más John Deere a los títulos */
+h1, h2, h3 {
+  color: var(--jd-green);
+}
