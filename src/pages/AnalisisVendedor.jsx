@@ -3,7 +3,6 @@ import { useVentas } from '../hooks/useVentas';
 import KpiCard from '../components/dashboard/KpiCard';
 import { calcularMargenPorOperacion, getColorParaMargen, generarRankingVendedores } from '../utils/calculations';
 
-// --- FUNCIONES AUXILIARES ---
 const getAñoFiscal = (fecha) => {
     if (!(fecha instanceof Date) || isNaN(fecha)) return null;
     const año = fecha.getFullYear();
@@ -36,7 +35,6 @@ const calcularKPIsVendedor = (ventasVendedor) => {
     };
 };
 
-// --- COMPONENTE PRINCIPAL ---
 export default function AnalisisVendedor() {
     const { ventas: ventasOriginales, loading, error } = useVentas();
     const [vendedorSeleccionado, setVendedorSeleccionado] = useState('');
@@ -44,11 +42,10 @@ export default function AnalisisVendedor() {
     const [ordenarPor, setOrdenarPor] = useState('facturacionTotal');
     const [orden, setOrden] = useState('desc');
 
-    // --- CORRECCIÓN AQUÍ: CÁLCULO DIRECTO SIN useMemo PROBLEMÁTICO ---
+    // --- CORRECCIÓN DEFINITIVA AQUÍ ---
     const vendedoresUnicos = [...new Set((ventasOriginales || []).map(v => v.vendedor?.trim().toUpperCase()).filter(Boolean))].sort();
     const añosFiscalesUnicos = ['TODOS', ...[...new Set((ventasOriginales || []).map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean))].sort((a, b) => b - a)];
 
-    // El resto de los useMemo no causan problemas
     const ventasFiltradasPorAño = useMemo(() => {
         if (!ventasOriginales) return [];
         return ventasOriginales.filter(v => filtroAñoFiscal === 'TODOS' || getAñoFiscal(v.fechaVenta) === parseInt(filtroAñoFiscal));
@@ -57,9 +54,12 @@ export default function AnalisisVendedor() {
     const rankingVendedores = useMemo(() => {
         const ranking = generarRankingVendedores(ventasFiltradasPorAño);
         return ranking.sort((a, b) => {
-            if (a[ordenarPor] < b[ordenarPor]) return orden === 'asc' ? -1 : 1;
-            if (a[ordenarPor] > b[ordenarPor]) return orden === 'asc' ? 1 : -1;
-            return 0;
+            const valorA = a[ordenarPor];
+            const valorB = b[ordenarPor];
+            if (typeof valorA === 'string') {
+                return orden === 'asc' ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA);
+            }
+            return orden === 'asc' ? valorA - valorB : valorB - valorA;
         });
     }, [ventasFiltradasPorAño, ordenarPor, orden]);
 
