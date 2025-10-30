@@ -12,7 +12,7 @@ const headerStyles = {
 };
 
 const logoStyles = {
-    height: '50px', // Tamaño del logo aumentado
+    height: '100px', // Tamaño del logo aumentado
 };
 
 // Inyectamos un pequeño bloque de CSS para controlar la visibilidad del botón de menú

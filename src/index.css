@@ -31,7 +31,7 @@ h1, h2, h3 {
   left: 0;
   height: 100vh;
   padding: 1rem;
-  background: var(--card-background-color);
+  background-color: var(--card-background-color); /* Usa el color de fondo de las tarjetas de Pico */
   border-right: 1px solid var(--card-border-color);
   z-index: 1000;
   transition: transform 0.3s ease-in-out;
@@ -66,3 +66,4 @@ h1, h2, h3 {
     margin-left: 240px; /* Dejamos espacio para la sidebar */
   }
 }
+
