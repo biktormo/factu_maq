@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 const headerStyles = {
     display: 'flex',
@@ -7,22 +8,21 @@ const headerStyles = {
     padding: '0.5rem 1.5rem',
     borderBottom: '1px solid var(--card-border-color)',
     background: 'var(--background-color)',
-    zIndex: 5, // Asegura que esté por encima del contenido pero debajo de la sidebar si se superpone
+    zIndex: 5,
 };
 
 const logoStyles = {
-    height: '40px',
+    height: '50px', // Tamaño del logo aumentado
 };
 
 // Inyectamos un pequeño bloque de CSS para controlar la visibilidad del botón de menú
-// Esto es más simple que crear otro archivo CSS solo para esto.
 const responsiveCSS = `
   .menu-button {
-    display: none; /* Oculto por defecto */
+    display: none; /* Oculto por defecto en pantallas grandes */
   }
   @media (max-width: 768px) {
     .menu-button {
-      display: block; /* Visible en pantallas pequeñas */
+      display: block; /* Visible solo en pantallas pequeñas */
     }
   }
 `;
@@ -44,7 +44,7 @@ export default function Header({ onMenuClick }) {
         setTheme(currentTheme => {
             if (currentTheme === 'light') return 'dark';
             if (currentTheme === 'dark') return 'auto';
-            return 'light'; // De 'auto' a 'light'
+            return 'light';
         });
     };
 
@@ -66,7 +66,9 @@ export default function Header({ onMenuClick }) {
                 >
                     ☰
                 </button>
-                <img src="/Sartor_Logos_1.png" alt="Logo Concesionario" style={logoStyles} />
+                <Link to="/">
+                    <img src="/Sartor_Logos_1.png" alt="Logo Sartor" style={logoStyles} />
+                </Link>
             </div>
             <div>
                 <button onClick={toggleTheme} className="secondary outline">

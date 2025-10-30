@@ -6,7 +6,6 @@ import Header from './components/layout/Header.jsx';
 export default function App() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-  // Función para pasar al Header y que pueda abrir/cerrar la sidebar
   const toggleSidebar = () => {
     setSidebarOpen(!isSidebarOpen);
   };

@@ -18,6 +18,13 @@ const customSelectStyles = () => ({
   multiValueLabel: (baseStyles) => ({ ...baseStyles, color: 'var(--primary-inverse)' }),
 });
 
+const getAñoFiscal = (fecha) => {
+    if (!(fecha instanceof Date) || isNaN(fecha)) return null;
+    const año = fecha.getFullYear();
+    const mes = fecha.getMonth();
+    return mes >= 10 ? año + 1 : año;
+};
+
 export default function Reportes() {
   const { ventas, loading, error } = useVentas();
   
@@ -25,6 +32,7 @@ export default function Reportes() {
   const [filtroVendedor, setFiltroVendedor] = useState('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+  const [filtroAñoFiscal, setFiltroAñoFiscal] = useState('TODOS');
 
   const [ordenRentabilidadPor, setOrdenRentabilidadPor] = useState('margenTotal');
   const [ordenRentabilidad, setOrdenRentabilidad] = useState('desc');
@@ -44,9 +52,10 @@ export default function Reportes() {
       const fechaVenta = venta.fechaVenta;
       const matchFechaDesde = !desde || fechaVenta >= desde;
       const matchFechaHasta = !hasta || fechaVenta <= hasta;
-      return matchTipo && matchVendedor && matchFechaDesde && matchFechaHasta;
+      const matchAñoFiscal = filtroAñoFiscal === 'TODOS' || getAñoFiscal(venta.fechaVenta) === parseInt(filtroAñoFiscal);
+      return matchTipo && matchVendedor && matchFechaDesde && matchFechaHasta && matchAñoFiscal;
     });
-  }, [ventas, filtrosTipo, filtroVendedor, fechaDesde, fechaHasta, loading]);
+  }, [ventas, filtrosTipo, filtroVendedor, fechaDesde, fechaHasta, filtroAñoFiscal, loading]);
 
   const rentabilidadPorModelo = useMemo(() => {
     const analisis = analizarRentabilidadPorModelo(ventasFiltradas);
@@ -70,6 +79,12 @@ export default function Reportes() {
     if (loading || !ventas) return [];
     const vendedoresLimpios = ventas.map(v => v.vendedor?.trim().toUpperCase()).filter(Boolean);
     return [...new Set(vendedoresLimpios)].sort();
+  }, [ventas, loading]);
+  
+  const añosFiscalesUnicos = useMemo(() => {
+    if (loading || !ventas) return [];
+    const años = ventas.map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean);
+    return ['TODOS', ...[...new Set(años)].sort((a, b) => b - a)];
   }, [ventas, loading]);
 
   const handleExportExcel = () => {
@@ -212,6 +227,12 @@ export default function Reportes() {
               value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)}
             />
+          </div>
+          <div>
+            <label htmlFor="filtro-fy-reporte">Filtrar por Año Fiscal</label>
+            <select id="filtro-fy-reporte" value={filtroAñoFiscal} onChange={(e) => setFiltroAñoFiscal(e.target.value)}>
+                {añosFiscalesUnicos.map(año => (<option key={año} value={año}>{año === 'TODOS' ? 'TODOS' : `FY${año}`}</option>))}
+            </select>
           </div>
         </div>
 
