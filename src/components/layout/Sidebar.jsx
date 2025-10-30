@@ -4,6 +4,7 @@ import { auth } from '../../firebase/config';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../../context/AuthContext';
 
+// Estilos para el layout de la barra lateral
 const sidebarStyles = {
   width: '240px',
   position: 'fixed',
@@ -13,9 +14,10 @@ const sidebarStyles = {
   padding: '1rem',
   background: 'var(--card-background-color)',
   borderRight: '1px solid var(--card-border-color)',
-  zIndex: 10,
+  zIndex: 1000,
   display: 'flex',
   flexDirection: 'column',
+  transition: 'transform 0.3s ease-in-out',
 };
 
 const logoStyles = {
@@ -28,9 +30,9 @@ const logoStyles = {
 
 // --- ESTA ES LA CONSTANTE QUE FALTABA ---
 const navStyles = {
-  flexGrow: 1, // Hace que la navegación ocupe el espacio disponible para empujar el botón de logout hacia abajo
+  flexGrow: 1, // Hace que la navegación ocupe el espacio disponible
 };
-// --- ---
+// ------------------------------------
 
 const activeLinkStyle = {
   backgroundColor: 'var(--primary)',
@@ -79,10 +81,8 @@ export default function Sidebar({ isOpen, closeSidebar }) {
           </div>
           <nav style={navStyles}>
             <ul>
-              {/* Dashboard: Todos los roles logueados */}
+              {/* Dashboard y Reportes: Todos los roles logueados */}
               <li><NavLink to="/" style={({ isActive }) => (isActive ? activeLinkStyle : inactiveLinkStyle)} onClick={handleLinkClick}>Dashboard</NavLink></li>
-              
-              {/* Reportes: Todos los roles logueados */}
               <li><NavLink to="/reportes" style={({ isActive }) => (isActive ? activeLinkStyle : inactiveLinkStyle)} onClick={handleLinkClick}>Reportes</NavLink></li>
               
               {/* Vendedores: Solo Viewer y Admin */}
@@ -102,6 +102,7 @@ export default function Sidebar({ isOpen, closeSidebar }) {
             </ul>
           </nav>
         </div>
+
         <div style={{ marginTop: 'auto' }}>
           <button onClick={handleLogout} className="contrast outline">
             Cerrar Sesión
