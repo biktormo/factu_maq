@@ -16,3 +16,53 @@
 h1, h2, h3 {
   color: var(--jd-green);
 }
+
+/* ... (tus variables de color y estilos de Pico.css van aquí arriba) ... */
+
+/* Estructura del Layout Principal */
+.app-layout {
+  display: flex;
+}
+
+.sidebar {
+  width: 240px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  padding: 1rem;
+  background: var(--card-background-color);
+  border-right: 1px solid var(--card-border-color);
+  z-index: 1000;
+  transition: transform 0.3s ease-in-out;
+}
+
+.main-content {
+  flex-grow: 1;
+  transition: margin-left 0.3s ease-in-out;
+}
+
+/* --- LÓGICA RESPONSIVE --- */
+
+/* Estilos para pantallas pequeñas (móviles) por defecto */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%); /* Sidebar oculta fuera de la pantalla */
+  }
+  .sidebar.is-open {
+    transform: translateX(0); /* Sidebar visible cuando tiene la clase 'is-open' */
+  }
+  .main-content {
+    margin-left: 0; /* El contenido principal ocupa todo el ancho */
+  }
+}
+
+/* Estilos para pantallas grandes (tablets y escritorio) */
+@media (min-width: 769px) {
+  .sidebar {
+    transform: translateX(0); /* Sidebar siempre visible */
+  }
+  .main-content {
+    margin-left: 240px; /* Dejamos espacio para la sidebar */
+  }
+}

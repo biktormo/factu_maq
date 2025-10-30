@@ -1,28 +1,25 @@
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import Sidebar from './components/layout/Sidebar';
-import Header from './components/layout/Header';
+import Sidebar from './components/layout/Sidebar.jsx';
+import Header from './components/layout/Header.jsx';
 
-// Estilos para el layout principal
-const mainContentStyles = {
-  marginLeft: '240px',
-};
+export default function App() {
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-const pageWrapperStyles = {
-  padding: '1.5rem',
-};
+  // Función para pasar al Header y que pueda abrir/cerrar la sidebar
+  const toggleSidebar = () => {
+    setSidebarOpen(!isSidebarOpen);
+  };
 
-function App() {
   return (
-    <div className="app-container">
-      <Sidebar />
-      <div style={mainContentStyles}>
-        <Header />
-        <main style={pageWrapperStyles}>
+    <div className="app-layout">
+      <Sidebar isOpen={isSidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
+      <div className="main-content">
+        <Header onMenuClick={toggleSidebar} />
+        <main style={{ padding: '1.5rem' }}>
           <Outlet />
         </main>
       </div>
     </div>
   );
 }
-
-export default App;

@@ -7,17 +7,28 @@ const headerStyles = {
     padding: '0.5rem 1.5rem',
     borderBottom: '1px solid var(--card-border-color)',
     background: 'var(--background-color)',
-    zIndex: 5,
+    zIndex: 5, // Asegura que esté por encima del contenido pero debajo de la sidebar si se superpone
 };
 
 const logoStyles = {
-    height: '90px',
+    height: '40px',
 };
 
-export default function Header() {
-    const [theme, setTheme] = useState(() => {
-        return localStorage.getItem('theme') || 'auto';
-    });
+// Inyectamos un pequeño bloque de CSS para controlar la visibilidad del botón de menú
+// Esto es más simple que crear otro archivo CSS solo para esto.
+const responsiveCSS = `
+  .menu-button {
+    display: none; /* Oculto por defecto */
+  }
+  @media (max-width: 768px) {
+    .menu-button {
+      display: block; /* Visible en pantallas pequeñas */
+    }
+  }
+`;
+
+export default function Header({ onMenuClick }) {
+    const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'auto');
 
     useEffect(() => {
         if (theme === 'auto') {
@@ -33,21 +44,29 @@ export default function Header() {
         setTheme(currentTheme => {
             if (currentTheme === 'light') return 'dark';
             if (currentTheme === 'dark') return 'auto';
-            return 'light'; // De auto a light
+            return 'light'; // De 'auto' a 'light'
         });
     };
 
     const getThemeIcon = () => {
         if (theme === 'light') return '☀️';
         if (theme === 'dark') return '🌙';
-        return '💻'; // Icono para 'auto'
+        return '💻';
     };
 
     return (
         <header style={headerStyles}>
-            <div>
-                {/* La ruta es absoluta desde la raíz del sitio, porque está en la carpeta /public */}
-                <img src="/Sartor_Logos_1.png" alt="Logo SARTOR" style={logoStyles} />
+            <style>{responsiveCSS}</style>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <button 
+                    className="secondary outline menu-button" 
+                    onClick={onMenuClick} 
+                    aria-label="Abrir menú"
+                    style={{ padding: '0.25rem 0.5rem' }}
+                >
+                    ☰
+                </button>
+                <img src="/Sartor_Logos_1.png" alt="Logo Concesionario" style={logoStyles} />
             </div>
             <div>
                 <button onClick={toggleTheme} className="secondary outline">

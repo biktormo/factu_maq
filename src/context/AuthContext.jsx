@@ -10,26 +10,39 @@ export const useAuth = () => {
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState(null); // <-- NUEVO ESTADO PARA EL ROL
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // onAuthStateChanged es un "oyente" de Firebase que se activa
-    // cada vez que el estado de autenticación cambia (login, logout).
-    const unsubscribe = onAuthStateChanged(auth, user => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      if (user) {
+        try {
+          // Cuando el usuario inicia sesión, obtenemos su token JWT
+          const idTokenResult = await user.getIdTokenResult();
+          // Leemos los custom claims del token (el rol que asignaremos)
+          const role = idTokenResult.claims.role || 'viewer'; // Por defecto, es 'viewer'
+          setUserRole(role);
+        } catch (error) {
+          console.error("Error al obtener el rol del usuario:", error);
+          setUserRole('viewer'); // Si hay error, asignamos el rol más restrictivo
+        }
+      } else {
+        setUserRole(null); // No hay rol si no hay usuario
+      }
       setLoading(false);
     });
-
-    // Limpiamos el oyente cuando el componente se desmonta
     return unsubscribe;
   }, []);
 
   const value = {
     currentUser,
+    userRole, // <-- EXPORTAMOS EL ROL
+    isAdmin: userRole === 'admin',
+    isCargador: userRole === 'admin' || userRole === 'cargador',
+    isViewer: userRole === 'admin' || userRole === 'cargador' || userRole === 'viewer',
   };
 
-  // Mientras se verifica el estado de autenticación, no mostramos nada.
-  // Esto evita parpadeos en la interfaz.
   return (
     <AuthContext.Provider value={value}>
       {!loading && children}

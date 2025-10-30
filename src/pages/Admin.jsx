@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { db } from '../firebase/config';
 import { collection, writeBatch, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 
-// Funciones de limpieza (sin cambios)
+// --- FUNCIONES DE LIMPIEZA PARA EL CSV ---
 const limpiarMoneda = (valor) => {
   if (!valor || typeof valor !== 'string') return 0;
   const valorLimpio = valor.replace(/USS|\$|"/g, "").trim().replace(/\./g, '').replace(/,/g, '.');
@@ -21,9 +22,17 @@ const parsearFecha = (fechaStr) => {
   return isNaN(fecha.getTime()) ? null : fecha;
 };
 
+// --- COMPONENTE PRINCIPAL ---
 export default function Admin() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  
+  const [userEmail, setUserEmail] = useState('');
+  const [userRole, setUserRole] = useState('viewer');
+  const [roleStatus, setRoleStatus] = useState('');
+  const [roleLoading, setRoleLoading] = useState(false);
+  
+  const { currentUser } = useAuth();
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -36,55 +45,25 @@ export default function Admin() {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        setUploadStatus(`Archivo leído. Se encontraron ${results.data.length} filas. Procesando...`);
-        
+        setUploadStatus(`Archivo leído. ${results.data.length} filas encontradas. Procesando...`);
         const ventasProcesadas = results.data.map(row => {
             const fechaVenta = parsearFecha(row['FECHA']);
             if (!fechaVenta) return null;
-
-            // --- ¡NUEVA LÓGICA AQUÍ! ---
             return {
-              tipoProducto: row['MAQUINARIA'] || 'No especificado',
-              fechaVenta: fechaVenta,
-              modelo: row['MODELO'] || 'No especificado',
-              numeroFactura: row['FACTURA'] || '',
-              cliente: row['CLIENTE'] || 'No especificado',
-              vendedor: row['VENDEDOR'] || 'No especificado',
-              sucursal: row['SUCURSAL'] || 'No especificado',
-              costoUSD: limpiarMoneda(row[' COSTO U$S']),
-              costoNetoUSD: limpiarMoneda(row[' COSTO NETO U$D']), // <-- NUEVO CAMPO
-              ventaBrutaUSD: limpiarMoneda(row[' VENTA U$S']),
-              tipoDeCambio: limpiarMoneda(row['T.C.']),
-              totalIncentivos: limpiarMoneda(row['TOTAL INCENTIVOS']), // <-- NUEVO CAMPO
-              fleteARS: 0, // Mantenemos por si se usa a futuro
-              fleteAbsorbido: true,
-              incentivos: { // Seguimos guardando los porcentajes para referencia
-                retail: limpiarPorcentaje(row['RETAIL']),
-                plaPowertool: limpiarPorcentaje(row['PLA POWERTOUR']), // Corregido el typo
-                volumen: limpiarPorcentaje(row['VOLUMEN']),
-                combo: limpiarPorcentaje(row['COMBO']),
-                agroactiva: limpiarPorcentaje(row['AGROACTIVA']),
-                agronea: limpiarPorcentaje(row['AGRONEA']),
-                expoagro: limpiarPorcentaje(row['EXPOAGRO']),
-                contra: limpiarPorcentaje(row['CONTRA']),
-                fojd: limpiarPorcentaje(row['FOJD']),
-                preventa: limpiarPorcentaje(row['PREVENTA']),
-                expJDeere: limpiarPorcentaje(row['EXP.J.DEERE']),
-                adPrev: limpiarPorcentaje(row['AD.PREV'])
-              },
-              tomaUsado: {
-                seTomo: row['ENT.USADO'] === 'SI',
-                modelo: row['MODELO2'] || '',
-                precioTomaUSD: limpiarMoneda(row['PCIO TOMA'])
-              }
+              tipoProducto: row['MAQUINARIA'] || 'No especificado', fechaVenta, modelo: row['MODELO'] || 'No especificado',
+              numeroFactura: row['FACTURA'] || '', cliente: row['CLIENTE'] || 'No especificado', vendedor: row['VENDEDOR'] || 'No especificado',
+              sucursal: row['SUCURSAL'] || 'No especificado', costoUSD: limpiarMoneda(row[' COSTO U$S']), costoNetoUSD: limpiarMoneda(row[' COSTO NETO U$D']),
+              ventaBrutaUSD: limpiarMoneda(row[' VENTA U$S']), tipoDeCambio: limpiarMoneda(row['T.C.']), totalIncentivos: limpiarMoneda(row['TOTAL INCENTIVOS']),
+              fleteARS: 0, fleteAbsorbido: true,
+              incentivos: { retail: limpiarPorcentaje(row['RETAIL']), plaPowertool: limpiarPorcentaje(row['PLA POWERTOUR']), volumen: limpiarPorcentaje(row['VOLUMEN']), combo: limpiarPorcentaje(row['COMBO']), agroactiva: limpiarPorcentaje(row['AGROACTIVA']), agronea: limpiarPorcentaje(row['AGRONEA']), expoagro: limpiarPorcentaje(row['EXPOAGRO']), contra: limpiarPorcentaje(row['CONTRA']), fojd: limpiarPorcentaje(row['FOJD']), preventa: limpiarPorcentaje(row['PREVENTA']), expJDeere: limpiarPorcentaje(row['EXP.J.DEERE']), adPrev: limpiarPorcentaje(row['AD.PREV']) },
+              tomaUsado: { seTomo: row['ENT.USADO'] === 'SI', modelo: row['MODELO2'] || '', precioTomaUSD: limpiarMoneda(row['PCIO TOMA']) }
             };
-          }).filter(Boolean); // Filtra todas las filas que devolvieron null
+          }).filter(Boolean);
 
-        setUploadStatus(`Procesamiento completo. ${ventasProcesadas.length} registros válidos para subir. NO CIERRES ESTA PÁGINA.`);
+        setUploadStatus(`Procesamiento completo. ${ventasProcesadas.length} registros válidos. NO CIERRES ESTA PÁGINA.`);
         
         try {
           const ventasCollectionRef = collection(db, 'ventas');
-          
           setUploadStatus('Borrando datos antiguos... (Esto puede tardar un momento)');
           const querySnapshot = await getDocs(ventasCollectionRef);
           
@@ -128,36 +107,110 @@ export default function Admin() {
     });
   };
 
-  return (
-    <article>
-      <header>
-        <h2>Administración de Datos</h2>
-      </header>
+  const handleSetRole = async (e) => {
+    e.preventDefault();
+    if (!currentUser) {
+      setRoleStatus('Error: Debes estar autenticado para realizar esta acción.');
+      return;
+    }
+    setRoleLoading(true);
+    setRoleStatus('');
+
+    try {
+      const idToken = await currentUser.getIdToken();
       
-      <h3>Actualización Masiva de Ventas</h3>
-      <p>
-        Sube un archivo <code>.csv</code> para reemplazar <strong>TODOS</strong> los datos de ventas existentes.
-        Asegúrate de que el archivo tenga las mismas columnas que el original, incluyendo <strong>'COSTO NETO U$D'</strong> y <strong>'TOTAL INCENTIVOS'</strong>.
-      </p>
+      const response = await fetch('/.netlify/functions/set-role', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: userEmail, role: userRole }),
+      });
+      
+      const data = await response.json();
 
-      <form>
-        <label htmlFor="csv-upload">Seleccionar archivo CSV</label>
-        <input 
-          type="file" 
-          id="csv-upload" 
-          name="csv-upload" 
-          accept=".csv"
-          onChange={handleFileUpload}
-          disabled={isUploading}
-        />
-      </form>
+      if (!response.ok) {
+        throw new Error(data.error || 'Ocurrió un error en el servidor.');
+      }
 
-      {uploadStatus && (
-        <div style={{ marginTop: '1rem' }}>
-          <p>{uploadStatus}</p>
-          {isUploading && <progress />}
-        </div>
-      )}
-    </article>
+      setRoleStatus(data.message);
+      setUserEmail('');
+    } catch (error) {
+      setRoleStatus(`Error: ${error.message}`);
+    } finally {
+      setRoleLoading(false);
+    }
+  };
+
+  return (
+    <main className="container">
+      <article>
+        <header>
+          <h2>Actualización Masiva de Ventas</h2>
+        </header>
+        <p>
+          Sube un archivo <code>.csv</code> para reemplazar <strong>TODOS</strong> los datos de ventas existentes.
+          Asegúrate de que el archivo tenga las columnas correctas. Este proceso no se puede deshacer.
+        </p>
+
+        <form>
+          <label htmlFor="csv-upload">Seleccionar archivo CSV</label>
+          <input 
+            type="file" 
+            id="csv-upload" 
+            name="csv-upload" 
+            accept=".csv"
+            onChange={handleFileUpload}
+            disabled={isUploading}
+          />
+        </form>
+
+        {uploadStatus && (
+          <div style={{ marginTop: '1rem' }}>
+            <p>{uploadStatus}</p>
+            {isUploading && <progress />}
+          </div>
+        )}
+      </article>
+
+      <article style={{ marginTop: '2rem' }}>
+        <header>
+          <h3>Gestión de Roles de Usuario</h3>
+        </header>
+        <p>Asigna roles a los usuarios por su correo electrónico. El usuario debe cerrar y volver a iniciar sesión para que los cambios tomen efecto.</p>
+        <form onSubmit={handleSetRole}>
+          <div className="grid">
+            <div>
+              <label htmlFor="user-email">Correo Electrónico del Usuario</label>
+              <input 
+                type="email" 
+                id="user-email"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                placeholder="usuario@ejemplo.com"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="user-role">Asignar Rol</label>
+              <select 
+                id="user-role" 
+                value={userRole} 
+                onChange={(e) => setUserRole(e.target.value)}
+              >
+                <option value="viewer">Visor (Gerencial)</option>
+                <option value="cargador">Operador de Carga</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" aria-busy={roleLoading} disabled={roleLoading}>
+            {roleLoading ? 'Asignando...' : 'Asignar Rol'}
+          </button>
+        </form>
+        {roleStatus && <p style={{ marginTop: '1rem' }}>{roleStatus}</p>}
+      </article>
+    </main>
   );
 }

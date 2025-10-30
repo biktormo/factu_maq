@@ -1,13 +1,16 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';;
+import { useAuth } from '../../context/AuthContext';
 
-// Este componente verifica si hay un usuario. Si no, redirige al login.
 export default function RutaProtegida({ children }) {
-  const { currentUser } = useAuth();
+  const { currentUser, isCargador } = useAuth();
 
   if (!currentUser) {
     return <Navigate to="/login" />;
+  }
+  if (!isCargador) {
+    // Si no es Cargador (o Admin), no tiene permiso. Lo mandamos al dashboard.
+    return <Navigate to="/" />;
   }
 
   return children;
