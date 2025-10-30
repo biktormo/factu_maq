@@ -5,17 +5,35 @@ export default function KpiCard({ title, value, subtext }) {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    justifyContent: 'space-between',
-    textAlign: 'center', // Centramos todo el contenido
+    textAlign: 'center',
   };
+  
+  const contentWrapperStyle = {
+    flexGrow: 1, // Ocupa el espacio disponible
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center', // <-- CENTRA VERTICALMENTE
+  };
+
+  const valueStyle = {
+    fontSize: '2.25rem', // Reducimos un poco el tamaño
+    lineHeight: 1.1,
+    margin: '0.25rem 0', // Ajustamos el margen
+    color: 'var(--primary)',
+    fontWeight: 'bold',
+  };
+
+  const valueAsString = String(value);
 
   return (
     <article style={cardStyle}>
-      <div>
+      <div style={contentWrapperStyle}>
         <p style={{ margin: 0, fontWeight: 'bold' }}>{title}</p>
-        {/* Aumentamos el tamaño de fuente y quitamos la lógica de separación */}
-        <h2 style={{ fontSize: '2.5rem', margin: '0.5rem 0' }}>{value}</h2>
+        <h2 style={valueStyle}>
+          {valueAsString}
+        </h2>
       </div>
+      
       <p style={{ margin: 0 }}><small>{subtext}</small></p>
     </article>
   );

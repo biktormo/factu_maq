@@ -35,6 +35,7 @@ h1, h2, h3 {
   border-right: 1px solid var(--card-border-color);
   z-index: 1000;
   transition: transform 0.3s ease-in-out;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
 }
 
 .main-content {
