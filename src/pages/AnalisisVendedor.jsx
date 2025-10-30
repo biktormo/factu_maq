@@ -44,9 +44,11 @@ export default function AnalisisVendedor() {
     const [ordenarPor, setOrdenarPor] = useState('facturacionTotal');
     const [orden, setOrden] = useState('desc');
 
+    // --- CORRECCIÓN DEFINITIVA AQUÍ ---
     const vendedoresUnicos = [...new Set((ventasOriginales || []).map(v => v.vendedor?.trim().toUpperCase()).filter(Boolean))].sort();
     const añosFiscalesUnicos = ['TODOS', ...[...new Set((ventasOriginales || []).map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean))].sort((a, b) => b - a)];
 
+    // El resto de los useMemo se mantienen por eficiencia
     const ventasFiltradasPorAño = useMemo(() => {
         if (!ventasOriginales) return [];
         return ventasOriginales.filter(v => filtroAñoFiscal === 'TODOS' || getAñoFiscal(v.fechaVenta) === parseInt(filtroAñoFiscal));
