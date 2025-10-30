@@ -3,7 +3,6 @@ import { useVentas } from '../hooks/useVentas';
 import KpiCard from '../components/dashboard/KpiCard';
 import { calcularMargenPorOperacion, getColorParaMargen, generarRankingVendedores } from '../utils/calculations';
 
-// --- FUNCIONES AUXILIARES ---
 const getAñoFiscal = (fecha) => {
     if (!(fecha instanceof Date) || isNaN(fecha)) return null;
     const año = fecha.getFullYear();
@@ -36,7 +35,6 @@ const calcularKPIsVendedor = (ventasVendedor) => {
     };
 };
 
-// --- COMPONENTE PRINCIPAL ---
 export default function AnalisisVendedor() {
     const { ventas: ventasOriginales, loading, error } = useVentas();
     const [vendedorSeleccionado, setVendedorSeleccionado] = useState('');
@@ -44,11 +42,9 @@ export default function AnalisisVendedor() {
     const [ordenarPor, setOrdenarPor] = useState('facturacionTotal');
     const [orden, setOrden] = useState('desc');
 
-    // --- CORRECCIÓN DEFINITIVA AQUÍ ---
     const vendedoresUnicos = [...new Set((ventasOriginales || []).map(v => v.vendedor?.trim().toUpperCase()).filter(Boolean))].sort();
     const añosFiscalesUnicos = ['TODOS', ...[...new Set((ventasOriginales || []).map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean))].sort((a, b) => b - a)];
 
-    // El resto de los useMemo se mantienen por eficiencia
     const ventasFiltradasPorAño = useMemo(() => {
         if (!ventasOriginales) return [];
         return ventasOriginales.filter(v => filtroAñoFiscal === 'TODOS' || getAñoFiscal(v.fechaVenta) === parseInt(filtroAñoFiscal));
@@ -106,15 +102,49 @@ export default function AnalisisVendedor() {
             </div>
 
             {vendedorSeleccionado && (
-                <div style={{ marginTop: '2rem' }}>
-                    <h4>Rendimiento de: <strong>{vendedorSeleccionado}</strong> (en {filtroAñoFiscal === 'TODOS' ? 'todos los períodos' : `FY${filtroAñoFiscal}`})</h4>
-                    <div className="grid">
-                        <div><KpiCard title="Facturación Total (USD)" value={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpisVendedor.totalRevenueUSD)} subtext={`Total generado por ${vendedorSeleccionado}`} /></div>
-                        <div><KpiCard title="Margen Total (USD)" value={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpisVendedor.totalMarginUSD)} subtext="Ganancia total generada" /></div>
-                        <div><KpiCard title="Margen Promedio" value={kpisVendedor.averageMargin} subtext="Promedio de margen en sus ventas" /></div>
-                        <div><KpiCard title="Operaciones" value={kpisVendedor.salesVolume} subtext="Total de unidades vendidas" /></div>
+                <>
+                    <div style={{ marginTop: '2rem' }}>
+                        <h4>Rendimiento de: <strong>{vendedorSeleccionado}</strong> (en {filtroAñoFiscal === 'TODOS' ? 'todos los períodos' : `FY${filtroAñoFiscal}`})</h4>
+                        <div className="grid">
+                            <div><KpiCard title="Facturación Total (USD)" value={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpisVendedor.totalRevenueUSD)} subtext={`Total generado por ${vendedorSeleccionado}`} /></div>
+                            <div><KpiCard title="Margen Total (USD)" value={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpisVendedor.totalMarginUSD)} subtext="Ganancia total generada" /></div>
+                            <div><KpiCard title="Margen Promedio" value={kpisVendedor.averageMargin} subtext="Promedio de margen en sus ventas" /></div>
+                            <div><KpiCard title="Operaciones" value={kpisVendedor.salesVolume} subtext="Total de unidades vendidas" /></div>
+                        </div>
                     </div>
-                </div>
+                    <article style={{ marginTop: '2rem' }}>
+                        <header><h5>Detalle de Operaciones ({ventasVendedor.length})</h5></header>
+                        <div style={{ overflowX: 'auto', maxHeight: '400px' }}>
+                            <table>
+                                <thead>
+                                    <tr><th>Fecha</th><th>Tipo</th><th>Modelo</th><th>Venta (USD)</th><th>Margen %</th></tr>
+                                </thead>
+                                <tbody>
+                                    {ventasVendedor.map((venta) => {
+                                        const ventaBruta = venta.ventaBrutaUSD || 0;
+                                        const costoNeto = venta.costoNetoUSD || venta.costoUSD || 0;
+                                        let displayMargen;
+                                        if (ventaBruta <= 0) { displayMargen = <span style={{ fontStyle: 'italic', color: 'var(--muted-color)' }}>STOCK</span>;
+                                        } else if (costoNeto <= 0) { displayMargen = <span style={{ fontStyle: 'italic', color: 'var(--muted-color)' }}>PLAN</span>;
+                                        } else {
+                                            const margen = calcularMargenPorOperacion(venta);
+                                            displayMargen = <strong style={{ color: getColorParaMargen(margen) }}>{margen.toFixed(2)}%</strong>;
+                                        }
+                                        return (
+                                            <tr key={venta.id}>
+                                                <td>{venta.fechaVenta.toLocaleDateString('es-ES')}</td>
+                                                <td>{venta.tipoProducto}</td>
+                                                <td>{venta.modelo}</td>
+                                                <td>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(ventaBruta)}</td>
+                                                <td style={{ textAlign: 'center' }}>{displayMargen}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+                </>
             )}
 
             <article style={{ marginTop: '2rem' }}>
