@@ -1,12 +1,12 @@
 const admin = require('firebase-admin');
 
 // --- CONFIGURACIÓN DE CREDENCIALES DE SERVICIO ---
-// Guardaremos las credenciales como variables de entorno en Netlify
+// Estas variables deben estar configuradas en el entorno de Netlify
 const serviceAccount = {
   type: "service_account",
   project_id: process.env.VITE_FIREBASE_PROJECT_ID,
   private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Reemplaza los saltos de línea
+  private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
   client_email: process.env.FIREBASE_CLIENT_EMAIL,
   client_id: process.env.FIREBASE_CLIENT_ID,
   auth_uri: "https://accounts.google.com/o/oauth2/auth",
@@ -16,48 +16,40 @@ const serviceAccount = {
 };
 
 // Inicializamos Firebase Admin solo si no ha sido inicializado antes
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
+try {
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+  }
+} catch (e) {
+  console.error('Firebase Admin Initialization Error', e);
 }
 
+
 exports.handler = async function (event, context) {
-  // 1. Verificamos que sea una solicitud POST
+  // Solo permitimos solicitudes de tipo POST
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
-
-  // 2. Verificamos que el usuario que llama a la función sea un administrador
-  const { user } = context.clientContext;
-  if (!user || !user.app_metadata.roles?.includes('admin')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'No tienes permisos de administrador.' }) };
-  }
-
-  // 3. Obtenemos el email y el rol del cuerpo de la solicitud
-  const { email, role } = JSON.parse(event.body);
-  const ROLES_VALIDOS = ['admin', 'cargador', 'viewer'];
-
-  if (!email || !role || !ROLES_VALIDOS.includes(role)) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Email y rol son requeridos y el rol debe ser válido.' }) };
+    return { 
+      statusCode: 405, 
+      body: JSON.stringify({ error: 'Método no permitido' }) 
+    };
   }
 
   try {
-    // 4. Buscamos al usuario por su email
-    const userToUpdate = await admin.auth().getUserByEmail(email);
+    // 1. Obtener el token de Firebase del header de la solicitud
+    const idToken = event.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) {
+      return { 
+        statusCode: 401, 
+        body: JSON.stringify({ error: 'No se proporcionó token de autenticación.' }) 
+      };
+    }
 
-    // 5. Asignamos el custom claim (rol) al usuario
-    await admin.auth().setCustomUserClaims(userToUpdate.uid, { role });
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: `Rol '${role}' asignado correctamente al usuario ${email}` }),
-    };
-  } catch (error) {
-    console.error("Error al asignar rol:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
-    };
-  }
-};
+    // 2. Verificar el token y obtener los datos del usuario que hace la llamada
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    
+    // 3. Comprobar si el usuario que hace la llamada tiene el rol de 'admin'
+    if (decodedToken.role !== 'admin') {
+      return { 
+        statusCode: 403, // 4
