@@ -3,7 +3,7 @@ import { useVentas } from '../hooks/useVentas';
 import KpiCard from '../components/dashboard/KpiCard';
 import { calcularMargenPorOperacion, getColorParaMargen, generarRankingVendedores } from '../utils/calculations';
 
-// --- FUNCIONES AUXILIARES ESPECÍFICAS DE ESTA PÁGINA ---
+// --- FUNCIONES AUXILIARES ---
 const getAñoFiscal = (fecha) => {
     if (!(fecha instanceof Date) || isNaN(fecha)) return null;
     const año = fecha.getFullYear();
@@ -41,25 +41,17 @@ export default function AnalisisVendedor() {
     const { ventas: ventasOriginales, loading, error } = useVentas();
     const [vendedorSeleccionado, setVendedorSeleccionado] = useState('');
     const [filtroAñoFiscal, setFiltroAñoFiscal] = useState('TODOS');
-    
     const [ordenarPor, setOrdenarPor] = useState('facturacionTotal');
     const [orden, setOrden] = useState('desc');
 
-    const { vendedoresUnicos, añosFiscalesUnicos } = useMemo(() => {
-        if (!ventasOriginales) return { vendedoresUnicos: [], añosFiscalesUnicos: [] };
-        const vendedores = ventasOriginales.map(v => v.vendedor?.trim().toUpperCase()).filter(Boolean);
-        const años = ventasOriginales.map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean);
-        return {
-            vendedoresUnicos: [...new Set(vendedores)].sort(),
-            añosFiscalesUnicos: ['TODOS', ...[...new Set(años)].sort((a, b) => b - a)],
-        };
-    }, [ventasOriginales]);
+    // --- CORRECCIÓN AQUÍ: CÁLCULO DIRECTO SIN useMemo PROBLEMÁTICO ---
+    const vendedoresUnicos = [...new Set((ventasOriginales || []).map(v => v.vendedor?.trim().toUpperCase()).filter(Boolean))].sort();
+    const añosFiscalesUnicos = ['TODOS', ...[...new Set((ventasOriginales || []).map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean))].sort((a, b) => b - a)];
 
+    // El resto de los useMemo no causan problemas
     const ventasFiltradasPorAño = useMemo(() => {
         if (!ventasOriginales) return [];
-        return ventasOriginales.filter(v => {
-            return filtroAñoFiscal === 'TODOS' || getAñoFiscal(v.fechaVenta) === parseInt(filtroAñoFiscal);
-        });
+        return ventasOriginales.filter(v => filtroAñoFiscal === 'TODOS' || getAñoFiscal(v.fechaVenta) === parseInt(filtroAñoFiscal));
     }, [ventasOriginales, filtroAñoFiscal]);
 
     const rankingVendedores = useMemo(() => {
@@ -79,9 +71,8 @@ export default function AnalisisVendedor() {
     const kpisVendedor = useMemo(() => calcularKPIsVendedor(ventasVendedor), [ventasVendedor]);
 
     const handleOrdenar = (columna) => {
-        if (ordenarPor === columna) {
-            setOrden(prev => (prev === 'asc' ? 'desc' : 'asc'));
-        } else {
+        if (ordenarPor === columna) setOrden(prev => (prev === 'asc' ? 'desc' : 'asc'));
+        else {
             setOrdenarPor(columna);
             setOrden('desc');
         }
@@ -97,21 +88,15 @@ export default function AnalisisVendedor() {
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <div style={{ minWidth: '300px' }}>
                         <label htmlFor="select-vendedor">Seleccionar Vendedor</label>
-                        <select
-                            id="select-vendedor"
-                            value={vendedorSeleccionado}
-                            onChange={(e) => setVendedorSeleccionado(e.target.value)}
-                        >
+                        <select id="select-vendedor" value={vendedorSeleccionado} onChange={(e) => setVendedorSeleccionado(e.target.value)}>
                             <option value="">-- Elija un vendedor --</option>
-                            {vendedoresUnicos.map(vendedor => (
-                                <option key={vendedor} value={vendedor}>{vendedor}</option>
-                            ))}
+                            {vendedoresUnicos.map(vendedor => (<option key={vendedor} value={vendedor}>{vendedor}</option>))}
                         </select>
                     </div>
                     <div style={{ minWidth: '200px' }}>
                         <label htmlFor="filtro-fy-vendedor">Filtrar por Año Fiscal</label>
                         <select id="filtro-fy-vendedor" value={filtroAñoFiscal} onChange={(e) => setFiltroAñoFiscal(e.target.value)}>
-                            {añosFiscalesUnicos.map(año => <option key={año} value={año}>{año === 'TODOS' ? 'TODOS' : `FY${año}`}</option>)}
+                            {añosFiscalesUnicos.map(año => (<option key={año} value={año}>{año === 'TODOS' ? 'TODOS' : `FY${año}`}</option>))}
                         </select>
                     </div>
                 </div>
@@ -130,9 +115,7 @@ export default function AnalisisVendedor() {
             )}
 
             <article style={{ marginTop: '2rem' }}>
-                <header>
-                    <h5>Ranking de Vendedores ({filtroAñoFiscal === 'TODOS' ? 'General' : `FY${filtroAñoFiscal}`})</h5>
-                </header>
+                <header><h5>Ranking de Vendedores ({filtroAñoFiscal === 'TODOS' ? 'General' : `FY${filtroAñoFiscal}`})</h5></header>
                 <div style={{ overflowX: 'auto' }}>
                     <table>
                         <thead>
@@ -153,11 +136,7 @@ export default function AnalisisVendedor() {
                                     <td>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(vendedor.facturacionTotal)}</td>
                                     <td>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(vendedor.ticketPromedio)}</td>
                                     <td style={{ textAlign: 'center' }}>{vendedor.operaciones}</td>
-                                    <td style={{ textAlign: 'center' }}>
-                                        <strong style={{ color: getColorParaMargen(vendedor.margenPromedio) }}>
-                                            {vendedor.margenPromedio.toFixed(2)}%
-                                        </strong>
-                                    </td>
+                                    <td style={{ textAlign: 'center' }}><strong style={{ color: getColorParaMargen(vendedor.margenPromedio) }}>{vendedor.margenPromedio.toFixed(2)}%</strong></td>
                                 </tr>
                             ))}
                         </tbody>
