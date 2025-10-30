@@ -3,6 +3,7 @@ import { useVentas } from '../hooks/useVentas';
 import KpiCard from '../components/dashboard/KpiCard';
 import { calcularMargenPorOperacion, getColorParaMargen, generarRankingVendedores } from '../utils/calculations';
 
+// --- FUNCIONES AUXILIARES ---
 const getAñoFiscal = (fecha) => {
     if (!(fecha instanceof Date) || isNaN(fecha)) return null;
     const año = fecha.getFullYear();
@@ -35,6 +36,7 @@ const calcularKPIsVendedor = (ventasVendedor) => {
     };
 };
 
+// --- COMPONENTE PRINCIPAL ---
 export default function AnalisisVendedor() {
     const { ventas: ventasOriginales, loading, error } = useVentas();
     const [vendedorSeleccionado, setVendedorSeleccionado] = useState('');
@@ -42,7 +44,6 @@ export default function AnalisisVendedor() {
     const [ordenarPor, setOrdenarPor] = useState('facturacionTotal');
     const [orden, setOrden] = useState('desc');
 
-    // --- CORRECCIÓN DEFINITIVA AQUÍ ---
     const vendedoresUnicos = [...new Set((ventasOriginales || []).map(v => v.vendedor?.trim().toUpperCase()).filter(Boolean))].sort();
     const añosFiscalesUnicos = ['TODOS', ...[...new Set((ventasOriginales || []).map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean))].sort((a, b) => b - a)];
 

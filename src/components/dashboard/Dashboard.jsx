@@ -8,7 +8,6 @@ import PieChart from './PieChart';
 import MarginChart from './MarginChart';
 
 // --- FUNCIONES AUXILIARES ---
-
 const formatCurrencyAbbreviated = (num, currency) => {
   if (typeof num !== 'number' || isNaN(num)) return `${currency} 0`;
   if (Math.abs(num) >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)} G ${currency}`;
@@ -16,28 +15,23 @@ const formatCurrencyAbbreviated = (num, currency) => {
   if (Math.abs(num) >= 1_000) return `${(num / 1_000).toFixed(1)} K ${currency}`;
   return `${num.toFixed(0)} ${currency}`;
 };
-
 const getAñoFiscal = (fecha) => {
   if (!(fecha instanceof Date) || isNaN(fecha)) return null;
   const año = fecha.getFullYear();
   const mes = fecha.getMonth();
   return mes >= 10 ? año + 1 : año;
 };
-
 const calcularKPIs = (ventas) => {
-  if (!ventas || ventas.length === 0) {
-    return { totalRevenueUSD: 0, totalMarginUSD: 0, averageMargin: '0.00%', totalSalesVolume: 0, totalProducts: 0, stockUnits: 0, stockValueUSD: 0 };
-  }
-  let totalRevenueUSD = 0, totalMarginUSD = 0, totalSalesVolume = 0;
-  let stockUnits = 0, stockValueUSD = 0;
-
+  if (!ventas || ventas.length === 0) return { totalRevenueUSD: 0, totalMarginUSD: 0, averageMargin: '0.00%', totalSalesVolume: 0, totalProducts: 0, stockUnits: 0, stockValueUSD: 0 };
+  let totalRevenueUSD = 0, planAhorroRevenueUSD = 0, totalMarginUSD = 0, totalSalesVolume = 0, stockUnits = 0, stockValueUSD = 0;
   ventas.forEach(venta => {
     const ventaBruta = venta.ventaBrutaUSD || 0;
     const costo = venta.costoUSD || 0;
-    
     if (ventaBruta <= 0 && costo > 0) {
       stockUnits++;
       stockValueUSD += costo;
+    } else if (ventaBruta > 0 && costo <= 0) {
+      planAhorroRevenueUSD += ventaBruta;
     } else if (ventaBruta > 0 && costo > 0) {
       totalSalesVolume++;
       totalRevenueUSD += ventaBruta;
@@ -46,11 +40,9 @@ const calcularKPIs = (ventas) => {
       totalMarginUSD += margenBrutoUSD;
     }
   });
-  
   const averageMargin = (totalMarginUSD / totalRevenueUSD) * 100;
-
   return {
-    totalRevenueUSD,
+    totalRevenueUSD: totalRevenueUSD + planAhorroRevenueUSD,
     totalMarginUSD,
     averageMargin: (isNaN(averageMargin) ? 0 : averageMargin).toFixed(2) + '%',
     totalSalesVolume,
@@ -59,7 +51,6 @@ const calcularKPIs = (ventas) => {
     stockValueUSD,
   };
 };
-
 const prepararDatosTorta = (ventas, filtroProducto) => {
     const esFiltroGeneral = filtroProducto === 'TODOS';
     const dataMap = new Map();
@@ -97,14 +88,9 @@ export default function Dashboard() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const { tiposDeProductoUnicos, añosFiscalesUnicos } = useMemo(() => {
-    if (!ventasOriginales) return { tiposDeProductoUnicos: [], añosFiscalesUnicos: [] };
-    const tipos = ventasOriginales.map(v => v.tipoProducto).filter(Boolean);
-    const tiposUnicos = ['TODOS', ...[...new Set(tipos)].sort()];
-    const añosFiscales = ventasOriginales.map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean);
-    const añosUnicos = ['TODOS', ...[...new Set(añosFiscales)].sort((a, b) => b - a)];
-    return { tiposDeProductoUnicos, añosFiscalesUnicos };
-  }, [ventasOriginales]);
+  // --- CORRECCIÓN DEFINITIVA AQUÍ ---
+  const tiposDeProductoUnicos = ['TODOS', ...[...new Set((ventasOriginales || []).map(v => v.tipoProducto).filter(Boolean))].sort()];
+  const añosFiscalesUnicos = ['TODOS', ...[...new Set((ventasOriginales || []).map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean))].sort((a, b) => b - a)];
 
   const ventasFiltradas = useMemo(() => {
     if (!ventasOriginales) return [];
@@ -121,7 +107,6 @@ export default function Dashboard() {
   if (loadingVentas || loadingTC) {
     return <main className="container"><div aria-busy="true">Cargando datos...</div></main>;
   }
-  
   if (errorVentas) {
     return <main className="container"><article><header>Error</header><p>{errorVentas}</p></article></main>;
   }
