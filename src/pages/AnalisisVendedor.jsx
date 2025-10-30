@@ -14,7 +14,7 @@ const getAñoFiscal = (fecha) => {
 
 const calcularKPIsVendedor = (ventasVendedor) => {
     if (!ventasVendedor || ventasVendedor.length === 0) {
-        return { totalRevenueUSD: 0, averageMargin: '0.00%', salesVolume: 0, products: 0 };
+        return { totalRevenueUSD: 0, totalMarginUSD: 0, averageMargin: '0.00%', salesVolume: 0, products: 0 };
     }
     let totalRevenueUSD = 0;
     let totalMarginUSD = 0;
@@ -25,14 +25,14 @@ const calcularKPIsVendedor = (ventasVendedor) => {
         if (ventaBruta > 0 && costoNeto > 0) {
             salesVolume++;
             totalRevenueUSD += ventaBruta;
-            
-            const margen = calcularMargenPorOperacion(venta);
-            totalMarginUSD += ventaBruta * (margen / 100);
+            const margenBrutoUSD = ventaBruta - costoNeto;
+            totalMarginUSD += margenBrutoUSD;
         }
     });
     const averageMargin = (totalMarginUSD / totalRevenueUSD) * 100;
     return {
         totalRevenueUSD,
+        totalMarginUSD,
         averageMargin: (isNaN(averageMargin) ? 0 : averageMargin).toFixed(2) + '%',
         salesVolume,
         products: new Set(ventasVendedor.map(v => v.modelo)).size,
@@ -46,7 +46,6 @@ export default function AnalisisVendedor() {
     const [vendedorSeleccionado, setVendedorSeleccionado] = useState('');
     const [filtroAñoFiscal, setFiltroAñoFiscal] = useState('TODOS');
     
-    // Estados para el ordenamiento de la tabla de ranking
     const [ordenarPor, setOrdenarPor] = useState('facturacionTotal');
     const [orden, setOrden] = useState('desc');
 
@@ -123,23 +122,52 @@ export default function AnalisisVendedor() {
             </div>
 
             {vendedorSeleccionado && (
-                <div style={{ marginTop: '2rem' }}>
-                    <h4>Rendimiento de: <strong>{vendedorSeleccionado}</strong> (en {filtroAñoFiscal === 'TODOS' ? 'todos los períodos' : `FY${filtroAñoFiscal}`})</h4>
-                    <div className="grid">
-                        <div>
-                            <KpiCard title="Ingresos Totales (USD)" value={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpisVendedor.totalRevenueUSD)} subtext={`Total generado por ${vendedorSeleccionado}`} />
-                        </div>
-                        <div>
-                            <KpiCard title="Margen Promedio" value={kpisVendedor.averageMargin} subtext="Promedio de margen en sus ventas" />
-                        </div>
-                        <div>
-                            <KpiCard title="Operaciones" value={kpisVendedor.salesVolume} subtext="Total de unidades vendidas" />
-                        </div>
-                        <div>
-                            <KpiCard title="Modelos Únicos" value={kpisVendedor.products} subtext="Variedad de modelos vendidos" />
+                <>
+                    <div style={{ marginTop: '2rem' }}>
+                        <h4>Rendimiento de: <strong>{vendedorSeleccionado}</strong> (en {filtroAñoFiscal === 'TODOS' ? 'todos los períodos' : `FY${filtroAñoFiscal}`})</h4>
+                        <div className="grid">
+                            <div><KpiCard title="Facturación Total (USD)" value={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpisVendedor.totalRevenueUSD)} subtext={`Total generado por ${vendedorSeleccionado}`} /></div>
+                            <div><KpiCard title="Margen Total (USD)" value={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpisVendedor.totalMarginUSD)} subtext="Ganancia total generada" /></div>
+                            <div><KpiCard title="Margen Promedio" value={kpisVendedor.averageMargin} subtext="Promedio de margen en sus ventas" /></div>
+                            <div><KpiCard title="Operaciones" value={kpisVendedor.salesVolume} subtext="Total de unidades vendidas" /></div>
                         </div>
                     </div>
-                </div>
+                    
+                    <article style={{ marginTop: '2rem' }}>
+                        <header><h5>Detalle de Operaciones ({ventasVendedor.length})</h5></header>
+                        <div style={{ overflowX: 'auto', maxHeight: '400px' }}>
+                            <table>
+                                <thead>
+                                    <tr><th>Fecha</th><th>Tipo</th><th>Modelo</th><th>Venta (USD)</th><th>Margen %</th></tr>
+                                </thead>
+                                <tbody>
+                                    {ventasVendedor.map((venta) => {
+                                        const ventaBruta = venta.ventaBrutaUSD || 0;
+                                        const costoNeto = venta.costoNetoUSD || venta.costoUSD || 0;
+                                        let displayMargen;
+                                        if (ventaBruta <= 0) {
+                                            displayMargen = <span style={{ fontStyle: 'italic', color: 'var(--muted-color)' }}>STOCK</span>;
+                                        } else if (costoNeto <= 0) {
+                                            displayMargen = <span style={{ fontStyle: 'italic', color: 'var(--muted-color)' }}>PLAN</span>;
+                                        } else {
+                                            const margen = calcularMargenPorOperacion(venta);
+                                            displayMargen = <strong style={{ color: getColorParaMargen(margen) }}>{margen.toFixed(2)}%</strong>;
+                                        }
+                                        return (
+                                            <tr key={venta.id}>
+                                                <td>{venta.fechaVenta.toLocaleDateString('es-ES')}</td>
+                                                <td>{venta.tipoProducto}</td>
+                                                <td>{venta.modelo}</td>
+                                                <td>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(ventaBruta)}</td>
+                                                <td style={{ textAlign: 'center' }}>{displayMargen}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+                </>
             )}
 
             <article style={{ marginTop: '2rem' }}>

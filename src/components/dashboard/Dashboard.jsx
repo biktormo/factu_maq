@@ -11,15 +11,9 @@ import MarginChart from './MarginChart';
 
 const formatCurrencyAbbreviated = (num, currency) => {
   if (typeof num !== 'number' || isNaN(num)) return `${currency} 0`;
-  if (Math.abs(num) >= 1_000_000_000) {
-    return `${(num / 1_000_000_000).toFixed(2)} G ${currency}`;
-  }
-  if (Math.abs(num) >= 1_000_000) {
-    return `${(num / 1_000_000).toFixed(2)} M ${currency}`;
-  }
-  if (Math.abs(num) >= 1_000) {
-    return `${(num / 1_000).toFixed(1)} K ${currency}`;
-  }
+  if (Math.abs(num) >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)} G ${currency}`;
+  if (Math.abs(num) >= 1_000_000) return `${(num / 1_000_000).toFixed(2)} M ${currency}`;
+  if (Math.abs(num) >= 1_000) return `${(num / 1_000).toFixed(1)} K ${currency}`;
   return `${num.toFixed(0)} ${currency}`;
 };
 
@@ -32,35 +26,37 @@ const getAñoFiscal = (fecha) => {
 
 const calcularKPIs = (ventas) => {
   if (!ventas || ventas.length === 0) {
-    return { totalRevenueUSD: 0, totalMarginUSD: 0, averageMargin: '0.00%', totalSalesVolume: 0, totalProducts: 0 };
+    return { totalRevenueUSD: 0, totalMarginUSD: 0, averageMargin: '0.00%', totalSalesVolume: 0, totalProducts: 0, stockUnits: 0, stockValueUSD: 0 };
   }
-  let totalRevenueUSD = 0, planAhorroRevenueUSD = 0, totalMarginUSD = 0, totalSalesVolume = 0;
+  let totalRevenueUSD = 0, totalMarginUSD = 0, totalSalesVolume = 0;
+  let stockUnits = 0, stockValueUSD = 0;
+
   ventas.forEach(venta => {
     const ventaBruta = venta.ventaBrutaUSD || 0;
     const costo = venta.costoUSD || 0;
-    if (ventaBruta > 0 && costo <= 0) {
-      planAhorroRevenueUSD += ventaBruta;
+    
+    if (ventaBruta <= 0 && costo > 0) {
+      stockUnits++;
+      stockValueUSD += costo;
     } else if (ventaBruta > 0 && costo > 0) {
       totalSalesVolume++;
       totalRevenueUSD += ventaBruta;
-      const totalIncentivosPorcentaje = Object.values(venta.incentivos || {}).reduce((sum, val) => sum + val, 0);
-      const montoIncentivosUSD = ventaBruta * (totalIncentivosPorcentaje / 100);
-      const costoNetoUSD = costo - montoIncentivosUSD;
-      const margenBrutoUSD = ventaBruta - costoNetoUSD;
+      const costoNeto = venta.costoNetoUSD || costo;
+      const margenBrutoUSD = ventaBruta - costoNeto;
       totalMarginUSD += margenBrutoUSD;
-      const margenPorcentaje = (margenBrutoUSD / ventaBruta) * 100;
-      if (margenPorcentaje < -5 || margenPorcentaje > 50) {
-        console.warn('Posible inconsistencia de datos (margen anómalo):', { modelo: venta.modelo, fecha: venta.fechaVenta.toLocaleDateString(), costo: costo.toFixed(2), venta: ventaBruta.toFixed(2), margen: `${margenPorcentaje.toFixed(2)}%` });
-      }
     }
   });
+  
   const averageMargin = (totalMarginUSD / totalRevenueUSD) * 100;
+
   return {
-    totalRevenueUSD: totalRevenueUSD + planAhorroRevenueUSD,
-    totalMarginUSD: totalMarginUSD,
+    totalRevenueUSD,
+    totalMarginUSD,
     averageMargin: (isNaN(averageMargin) ? 0 : averageMargin).toFixed(2) + '%',
-    totalSalesVolume: totalSalesVolume,
-    totalProducts: new Set(ventas.map(v => v.modelo)).size,
+    totalSalesVolume,
+    totalProducts: new Set(ventas.filter(v => v.ventaBrutaUSD > 0).map(v => v.modelo)).size,
+    stockUnits,
+    stockValueUSD,
   };
 };
 
@@ -86,7 +82,6 @@ const prepararDatosTorta = (ventas, filtroProducto) => {
 };
 
 // --- COMPONENTE PRINCIPAL ---
-
 export default function Dashboard() {
   const { ventas: ventasOriginales, loading: loadingVentas, error: errorVentas } = useVentas();
   const { tipoDeCambio, loading: loadingTC } = useTipoDeCambio();
@@ -102,8 +97,14 @@ export default function Dashboard() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const tiposDeProductoUnicos = ['TODOS', ...[...new Set((ventasOriginales || []).map(v => v.tipoProducto).filter(Boolean))].sort()];
-  const añosFiscalesUnicos = ['TODOS', ...[...new Set((ventasOriginales || []).map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean))].sort((a, b) => b - a)];
+  const { tiposDeProductoUnicos, añosFiscalesUnicos } = useMemo(() => {
+    if (!ventasOriginales) return { tiposDeProductoUnicos: [], añosFiscalesUnicos: [] };
+    const tipos = ventasOriginales.map(v => v.tipoProducto).filter(Boolean);
+    const tiposUnicos = ['TODOS', ...[...new Set(tipos)].sort()];
+    const añosFiscales = ventasOriginales.map(v => getAñoFiscal(v.fechaVenta)).filter(Boolean);
+    const añosUnicos = ['TODOS', ...[...new Set(añosFiscales)].sort((a, b) => b - a)];
+    return { tiposDeProductoUnicos, añosFiscalesUnicos };
+  }, [ventasOriginales]);
 
   const ventasFiltradas = useMemo(() => {
     if (!ventasOriginales) return [];
@@ -146,42 +147,21 @@ export default function Dashboard() {
       </div>
       
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-        <div>
-          <KpiCard title="Facturación (USD)" value={formatCurrencyAbbreviated(kpis.totalRevenueUSD, '$')} subtext={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpis.totalRevenueUSD)} />
-        </div>
-        <div>
-          <KpiCard title="Facturación (Local)" value={formatCurrencyAbbreviated(kpis.totalRevenueUSD * tipoDeCambio, 'ARS')} subtext={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'ARS' }).format(kpis.totalRevenueUSD * tipoDeCambio)} />
-        </div>
-        <div>
-          <KpiCard title="Margen (USD)" value={formatCurrencyAbbreviated(kpis.totalMarginUSD, '$')} subtext={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpis.totalMarginUSD)} />
-        </div>
-        <div>
-          <KpiCard title="Margen Promedio" value={kpis.averageMargin} subtext="Sobre ventas con costo" />
-        </div>
-        <div>
-          <KpiCard title="Volumen de Ventas" value={new Intl.NumberFormat('de-DE').format(kpis.totalSalesVolume)} subtext="Unidades con costo" />
-        </div>
-        <div>
-          <KpiCard title="Modelos Únicos" value={kpis.totalProducts} subtext="En la selección actual" />
-        </div>
+        <div><KpiCard title="Facturación (USD)" value={formatCurrencyAbbreviated(kpis.totalRevenueUSD, '$')} subtext={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpis.totalRevenueUSD)} /></div>
+        <div><KpiCard title="Margen (USD)" value={formatCurrencyAbbreviated(kpis.totalMarginUSD, '$')} subtext={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpis.totalMarginUSD)} /></div>
+        <div><KpiCard title="Margen Promedio" value={kpis.averageMargin} subtext="Sobre ventas con costo" /></div>
+        <div><KpiCard title="Volumen de Ventas" value={new Intl.NumberFormat('de-DE').format(kpis.totalSalesVolume)} subtext="Unidades con costo" /></div>
+        <div><KpiCard title="Modelos Únicos" value={kpis.totalProducts} subtext="En la selección actual" /></div>
+        <div><KpiCard title="Unidades en Stock" value={new Intl.NumberFormat('de-DE').format(kpis.stockUnits)} subtext={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'USD' }).format(kpis.stockValueUSD)} /></div>
       </div>
       
       <div className="grid" style={{ marginTop: '2rem' }}>
-        <div style={{ gridColumn: '1 / span 2' }}>
-            <VentasRecientes ventas={ventasFiltradas} />
-        </div>
-        <div>
-            <PieChart data={datosGraficoTorta.data} title={datosGraficoTorta.title} isDarkMode={isDarkMode} />
-        </div>
+        <div style={{ gridColumn: '1 / span 2' }}><VentasRecientes ventas={ventasFiltradas} /></div>
+        <div><PieChart data={datosGraficoTorta.data} title={datosGraficoTorta.title} isDarkMode={isDarkMode} /></div>
       </div>
 
-      <div style={{ marginTop: '2rem' }}>
-        <SalesChart ventas={ventasFiltradas} añoFiscal={filtroAñoFiscal} isDarkMode={isDarkMode} />
-      </div>
-
-      <div style={{ marginTop: '2rem' }}>
-        <MarginChart ventas={ventasFiltradas} añoFiscal={filtroAñoFiscal} isDarkMode={isDarkMode} />
-      </div>
+      <div style={{ marginTop: '2rem' }}><SalesChart ventas={ventasFiltradas} añoFiscal={filtroAñoFiscal} isDarkMode={isDarkMode} /></div>
+      <div style={{ marginTop: '2rem' }}><MarginChart ventas={ventasFiltradas} añoFiscal={filtroAñoFiscal} isDarkMode={isDarkMode} /></div>
     </main>
   );
 }

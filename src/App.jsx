@@ -10,9 +10,21 @@ export default function App() {
     setSidebarOpen(!isSidebarOpen);
   };
 
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="app-layout">
-      <Sidebar isOpen={isSidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
+      {/* --- EL OVERLAY --- */}
+      {/* Se muestra solo si la sidebar está abierta. Al hacer clic en él, se cierra. */}
+      <div 
+        className={`sidebar-overlay ${isSidebarOpen ? 'is-active' : ''}`}
+        onClick={closeSidebar}
+      />
+
+      <Sidebar isOpen={isSidebarOpen} closeSidebar={closeSidebar} />
+      
       <div className="main-content">
         <Header onMenuClick={toggleSidebar} />
         <main style={{ padding: '1.5rem' }}>
